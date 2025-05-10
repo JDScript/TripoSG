@@ -7,7 +7,7 @@ from einops import repeat
 from diso import DiffDMC
 import torch.nn.functional as F
 
-from triposg.utils.typing import *
+from .utils.typing import *
 
 def generate_dense_grid_points_gpu(bbox_min: torch.Tensor,
                                    bbox_max: torch.Tensor,
@@ -189,7 +189,6 @@ def hierarchical_extract_geometry(geometric_func: Callable,
         torch.cuda.empty_cache()
     mesh_v_f = []
     try:
-        print("final grids shape = ", grid_logits.shape)
         vertices, faces, normals, _ = measure.marching_cubes(grid_logits.float().cpu().numpy(), 0, method="lewiner")
         vertices = vertices / (2**hierarchical_octree_depth) * bbox_size.cpu().numpy() + bbox_min.cpu().numpy()
         mesh_v_f = (vertices.astype(np.float32), np.ascontiguousarray(faces))
@@ -462,7 +461,6 @@ def flash_extract_geometry(
     mesh_v_f = []
     grid_logits = grid_logits[0]
     try:
-        print("final grids shape = ", grid_logits.shape)
         dmc = DiffDMC(dtype=torch.float32).to(grid_logits.device)
         sdf = -grid_logits / octree_resolution
         sdf = sdf.to(torch.float32).contiguous()

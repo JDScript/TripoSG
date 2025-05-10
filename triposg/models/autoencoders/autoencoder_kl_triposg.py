@@ -12,7 +12,7 @@ from diffusers.models.normalization import FP32LayerNorm, LayerNorm
 from diffusers.utils import logging
 from diffusers.utils.accelerate_utils import apply_forward_hook
 from einops import repeat
-# from torch_cluster import fps
+from torch_cluster import fps
 from tqdm import tqdm
 
 from ..attention_processor import FusedTripoSGAttnProcessor2_0, TripoSGAttnProcessor2_0, FlashTripoSGAttnProcessor2_0
@@ -434,7 +434,11 @@ class TripoSGVAEModel(ModelMixin, ConfigMixin):
             batch_size, -1, num_channels
         )
 
-        return sampled_points
+        mapped_indices = torch.tensor(indices, device=sampled_indices.device).repeat(batch_size)
+        mapped_indices = mapped_indices[sampled_indices]
+        mapped_indices = mapped_indices.view(batch_size, -1)
+
+        return sampled_points, mapped_indices
 
     def _encode(
         self, x: torch.Tensor, num_tokens: int = 2048, seed: Optional[int] = None
@@ -443,7 +447,7 @@ class TripoSGVAEModel(ModelMixin, ConfigMixin):
         positions, features = x[..., :position_channels], x[..., position_channels:]
         x_kv = torch.cat([self.embedder(positions), features], dim=-1)
 
-        sampled_x = self._sample_features(x, num_tokens, seed)
+        sampled_x, mapped_indices = self._sample_features(x, num_tokens, seed)
         positions, features = (
             sampled_x[..., :position_channels],
             sampled_x[..., position_channels:],
@@ -454,7 +458,7 @@ class TripoSGVAEModel(ModelMixin, ConfigMixin):
 
         x = self.quant(x)
 
-        return x
+        return x, mapped_indices
 
     @apply_forward_hook
     def encode(
@@ -470,12 +474,12 @@ class TripoSGVAEModel(ModelMixin, ConfigMixin):
             ]
             h = torch.cat(encoded_slices)
         else:
-            h = self._encode(x, **kwargs)
+            h, mapped_indices = self._encode(x, **kwargs)
 
         posterior = DiagonalGaussianDistribution(h, feature_dim=-1)
 
         if not return_dict:
-            return (posterior,)
+            return (posterior, mapped_indices)
         return AutoencoderKLOutput(latent_dist=posterior)
 
     def _decode(
