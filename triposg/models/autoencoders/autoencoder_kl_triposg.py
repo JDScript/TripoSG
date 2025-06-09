@@ -425,7 +425,7 @@ class TripoSGVAEModel(ModelMixin, ConfigMixin):
         # fps sampling
         sampling_ratio = 1.0 / 4
         sampled_indices = fps(
-            flattened_points[:, :3],
+            flattened_points[:, :3].float(),
             batch_indices,
             ratio=sampling_ratio,
             random_start=self.training,
