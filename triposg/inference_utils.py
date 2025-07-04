@@ -452,7 +452,7 @@ def flash_extract_geometry(
             logits_grid = vae.decode(latents,next_points[:, start_num:start_num + sum_num]).sample
             logits_grid_list.append(logits_grid)
         logits_grid = torch.cat(logits_grid_list, dim=1)
-        grid_logits[index.indices] = logits_grid.squeeze(0).squeeze(-1)
+        grid_logits[index.indices] = logits_grid.squeeze(0).squeeze(-1).to(grid_logits.dtype)
         next_logits[nidx] = grid_logits
         grid_logits = next_logits.unsqueeze(0)
     
